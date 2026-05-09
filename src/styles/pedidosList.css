@@ -1,0 +1,162 @@
+/* Contenedor principal */
+.tabla-pedidos-container {
+  max-width: 1000px;
+  margin: 30px auto;
+  padding: 20px;
+  background: #f9fbfd;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: "Segoe UI", Arial, sans-serif;
+  overflow-x: auto; /* ✅ scroll horizontal si no cabe */
+}
+
+/* Títulos */
+.tabla-pedidos-container h2 {
+  text-align: center;
+  color: #0066cc;
+  margin-bottom: 10px;
+}
+
+.tabla-pedidos-container h3 {
+  color: #004080;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+/* Formulario */
+form {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+form input,
+form button {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+form input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 4px rgba(0, 102, 204, 0.4);
+}
+
+form button {
+  background: #0066cc;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+form button:hover {
+  background: #004080;
+}
+
+/* Tablas */
+.tabla-pedidos {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+
+.tabla-pedidos th,
+.tabla-pedidos td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: center;
+}
+
+.tabla-pedidos th {
+  background: #e6f0ff;
+  color: #004080;
+  font-weight: bold;
+}
+
+.tabla-pedidos tr:nth-child(even) {
+  background: #f4f8fc;
+}
+
+.tabla-pedidos tr:hover {
+  background: #d9ecff;
+  transition: background 0.2s ease;
+}
+
+/* ✅ Columna Acciones muy angosta */
+.tabla-pedidos th:last-child,
+.tabla-pedidos td:last-child {
+  width: 50px;
+  text-align: center;
+}
+
+/* Totales */
+.grupo-dia p,
+.totales-mes p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.totales-mes {
+  background: #e6f0ff;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+/* Botones generales */
+button {
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+button:nth-of-type(1) {
+  background: #28a745;
+  color: white;
+}
+
+button:nth-of-type(1):hover {
+  background: #1e7e34;
+}
+
+button:nth-of-type(2) {
+  background: #dc3545;
+  color: white;
+}
+
+button:nth-of-type(2):hover {
+  background: #a71d2a;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  form {
+    flex-direction: column;
+  }
+
+  form input,
+  form button {
+    width: 100%;
+  }
+
+  .tabla-pedidos th,
+  .tabla-pedidos td {
+    font-size: 11px; /* ✅ más pequeño en móviles */
+    padding: 4px;
+  }
+
+  .tabla-pedidos th:last-child,
+  .tabla-pedidos td:last-child {
+    width: 40px; /* ✅ aún más angosta en móviles */
+  }
+
+  .tabla-pedidos-container {
+    padding: 15px;
+  }
+}
