@@ -11,77 +11,75 @@ import {
 
 function AdminPage() {
   const [usuarios, setUsuarios] = useState([]);
-  const [filtro, setFiltro] = useState("todos");
   const [correoBusqueda, setCorreoBusqueda] = useState("");
   const [usuarioEncontrado, setUsuarioEncontrado] = useState(null);
   const [mensaje, setMensaje] = useState("");
+  const [filtro, setFiltro] = useState("todos");
 
-  // Cargar todos los usuarios
+  // ------------------------
+  // CARGAR USUARIOS
+  // ------------------------
   const cargarUsuarios = async () => {
-    try {
-      const snap = await getDocs(collection(db, "usuarios"));
-      const lista = snap.docs.map((docu) => ({
-        id: docu.id,
-        ...docu.data(),
-      }));
-      setUsuarios(lista);
-    } catch (error) {
-      console.error("Error al cargar usuarios:", error);
-      setMensaje("No se pudieron cargar los usuarios");
-    }
+    const snap = await getDocs(collection(db, "usuarios"));
+    setUsuarios(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   };
 
   useEffect(() => {
     cargarUsuarios();
   }, []);
 
-  // Buscar usuario por correo
-  const buscarUsuarioPorCorreo = async () => {
-    try {
-      if (!correoBusqueda) {
-        setMensaje("Debes ingresar un correo");
-        return;
-      }
-      const q = query(
-        collection(db, "usuarios"),
-        where("email", "==", correoBusqueda.toLowerCase().trim()),
-      );
-      const snap = await getDocs(q);
+  // ------------------------
+  // BUSCAR USUARIO
+  // ------------------------
+  const buscarUsuario = async () => {
+    if (!correoBusqueda) return;
 
-      if (snap.empty) {
-        setUsuarioEncontrado(null);
-        setMensaje("No se encontró usuario con ese correo");
-        return;
-      }
+    const q = query(
+      collection(db, "usuarios"),
+      where("email", "==", correoBusqueda.toLowerCase().trim()),
+    );
 
-      const docu = snap.docs[0];
-      setUsuarioEncontrado({ id: docu.id, ...docu.data() });
-      setMensaje(`UID encontrado: ${docu.id}`);
-    } catch (error) {
-      console.error("Error al buscar usuario:", error);
-      setMensaje("Error al buscar usuario");
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      setUsuarioEncontrado(null);
+      setMensaje("Usuario no encontrado");
+      return;
     }
+
+    const docu = snap.docs[0];
+    setUsuarioEncontrado({ id: docu.id, ...docu.data() });
   };
 
-  // Cambiar estado activo
-  const cambiarEstadoUsuario = async (uid, nuevoEstado) => {
-    try {
-      const ref = doc(db, "usuarios", uid);
-      await updateDoc(ref, { activo: nuevoEstado });
-      setUsuarios((prev) =>
-        prev.map((u) => (u.id === uid ? { ...u, activo: nuevoEstado } : u)),
-      );
-      if (usuarioEncontrado && usuarioEncontrado.id === uid) {
-        setUsuarioEncontrado({ ...usuarioEncontrado, activo: nuevoEstado });
-      }
-      setMensaje(`Usuario ${uid} actualizado a activo=${nuevoEstado}`);
-    } catch (error) {
-      console.error("Error al actualizar usuario:", error);
-      setMensaje("No se pudo actualizar el estado");
-    }
+  // ------------------------
+  // LIMPIAR BÚSQUEDA
+  // ------------------------
+  const limpiarBusqueda = () => {
+    setUsuarioEncontrado(null);
+    setCorreoBusqueda("");
+    setMensaje("");
   };
 
-  // Filtrar usuarios
+  // ------------------------
+  // CAMBIAR ESTADO
+  // ------------------------
+  const cambiarEstado = async (uid, estado) => {
+    await updateDoc(doc(db, "usuarios", uid), { activo: estado });
+
+    setUsuarios((prev) =>
+      prev.map((u) => (u.id === uid ? { ...u, activo: estado } : u)),
+    );
+
+    if (usuarioEncontrado?.id === uid) {
+      setUsuarioEncontrado({ ...usuarioEncontrado, activo: estado });
+    }
+
+    setMensaje("Usuario actualizado");
+  };
+
+  // ------------------------
+  // FILTRO
+  // ------------------------
   const usuariosFiltrados = usuarios.filter((u) => {
     if (filtro === "activos") return u.activo === true;
     if (filtro === "inactivos") return u.activo === false;
@@ -89,192 +87,255 @@ function AdminPage() {
   });
 
   return (
-    <div
-      style={{
-        padding: "30px",
-        background: "#f0f2f5",
-        minHeight: "100vh",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "20px",
-          borderRadius: "8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          maxWidth: "900px",
-          margin: "0 auto",
-        }}
-      >
-        <h2 style={{ color: "#0d6efd", marginBottom: "10px" }}>
-          ⚙️ Panel de Administración
-        </h2>
-        <p style={{ color: "#555", marginBottom: "20px" }}>
-          Activa o desactiva usuarios, busca por correo y filtra por estado.
-        </p>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <h2 style={styles.title}>⚙️ Panel de Administración</h2>
 
-        {/* Buscador */}
-        <div style={{ marginBottom: "20px" }}>
+        {/* BUSCADOR */}
+        <div style={styles.search}>
           <input
-            type="email"
-            placeholder="Correo del usuario"
+            placeholder="Buscar usuario por correo..."
             value={correoBusqueda}
             onChange={(e) => setCorreoBusqueda(e.target.value)}
-            style={{
-              padding: "8px",
-              borderRadius: "6px",
-              border: "1px solid #ccc",
-              marginRight: "10px",
-              width: "250px",
-            }}
+            style={styles.input}
           />
-          <button
-            onClick={buscarUsuarioPorCorreo}
-            style={{
-              background: "#0d6efd",
-              color: "white",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
+
+          <button onClick={buscarUsuario} style={styles.button}>
             Buscar
           </button>
+
+          {usuarioEncontrado && (
+            <button onClick={limpiarBusqueda} style={styles.secondaryButton}>
+              Limpiar
+            </button>
+          )}
         </div>
 
-        {/* Usuario encontrado */}
-        {usuarioEncontrado && (
-          <div
-            style={{
-              background: "#f8f9fa",
-              padding: "15px",
-              borderRadius: "6px",
-              marginBottom: "20px",
-            }}
-          >
-            <p>
-              <strong>Correo:</strong> {usuarioEncontrado.email}
-            </p>
-            <p>
-              <strong>UID:</strong> {usuarioEncontrado.id}
-            </p>
-            <p>
-              <strong>Activo:</strong>{" "}
-              {usuarioEncontrado.activo ? "✅ Sí" : "❌ No"}
-            </p>
+        {/* FILTROS */}
+        {!usuarioEncontrado && (
+          <div style={styles.filters}>
             <button
-              onClick={() => cambiarEstadoUsuario(usuarioEncontrado.id, true)}
-              style={{
-                background: "green",
-                color: "white",
-                border: "none",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                marginRight: "10px",
-                cursor: "pointer",
-              }}
+              onClick={() => setFiltro("todos")}
+              style={filtro === "todos" ? styles.filterActive : styles.filter}
             >
-              Activar
+              Todos
             </button>
+
             <button
-              onClick={() => cambiarEstadoUsuario(usuarioEncontrado.id, false)}
-              style={{
-                background: "red",
-                color: "white",
-                border: "none",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
+              onClick={() => setFiltro("activos")}
+              style={filtro === "activos" ? styles.filterActive : styles.filter}
             >
-              Desactivar
+              Activos
+            </button>
+
+            <button
+              onClick={() => setFiltro("inactivos")}
+              style={
+                filtro === "inactivos" ? styles.filterActive : styles.filter
+              }
+            >
+              Inactivos
             </button>
           </div>
         )}
 
-        {/* Filtros */}
-        <div style={{ marginBottom: "20px" }}>
-          <button
-            onClick={() => setFiltro("todos")}
-            style={{ marginRight: "10px" }}
-          >
-            Todos
-          </button>
-          <button
-            onClick={() => setFiltro("activos")}
-            style={{ marginRight: "10px" }}
-          >
-            Activos
-          </button>
-          <button onClick={() => setFiltro("inactivos")}>Inactivos</button>
-        </div>
+        {/* USUARIO ENCONTRADO (SOLO UNO) */}
+        {usuarioEncontrado && (
+          <div style={styles.card}>
+            <p style={styles.email}>{usuarioEncontrado.email}</p>
 
-        {/* Tabla */}
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            marginBottom: "20px",
-          }}
-        >
-          <thead>
-            <tr style={{ background: "#e9ecef" }}>
-              <th style={{ padding: "10px", textAlign: "left" }}>Correo</th>
-              <th style={{ padding: "10px", textAlign: "left" }}>UID</th>
-              <th style={{ padding: "10px", textAlign: "left" }}>Activo</th>
-              <th style={{ padding: "10px", textAlign: "left" }}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
+            <p
+              style={usuarioEncontrado.activo ? styles.active : styles.inactive}
+            >
+              {usuarioEncontrado.activo ? "Activo" : "Inactivo"}
+            </p>
+
+            <div style={styles.row}>
+              <button
+                style={styles.btnGreen}
+                onClick={() => cambiarEstado(usuarioEncontrado.id, true)}
+              >
+                Activar
+              </button>
+
+              <button
+                style={styles.btnRed}
+                onClick={() => cambiarEstado(usuarioEncontrado.id, false)}
+              >
+                Desactivar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* LISTA SOLO SI NO HAY BÚSQUEDA */}
+        {!usuarioEncontrado && (
+          <div style={styles.grid}>
             {usuariosFiltrados.map((u) => (
-              <tr key={u.id} style={{ borderBottom: "1px solid #ddd" }}>
-                <td style={{ padding: "8px" }}>{u.email}</td>
-                <td style={{ padding: "8px" }}>{u.id}</td>
-                <td style={{ padding: "8px" }}>
-                  {u.activo ? "✅ Sí" : "❌ No"}
-                </td>
-                <td style={{ padding: "8px" }}>
+              <div key={u.id} style={styles.card}>
+                <p style={styles.email}>{u.email}</p>
+
+                <p style={u.activo ? styles.active : styles.inactive}>
+                  {u.activo ? "Activo" : "Inactivo"}
+                </p>
+
+                <div style={styles.row}>
                   <button
-                    onClick={() => cambiarEstadoUsuario(u.id, true)}
-                    style={{
-                      background: "green",
-                      color: "white",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      marginRight: "10px",
-                      cursor: "pointer",
-                    }}
+                    style={styles.btnGreen}
+                    onClick={() => cambiarEstado(u.id, true)}
                   >
                     Activar
                   </button>
+
                   <button
-                    onClick={() => cambiarEstadoUsuario(u.id, false)}
-                    style={{
-                      background: "red",
-                      color: "white",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                    }}
+                    style={styles.btnRed}
+                    onClick={() => cambiarEstado(u.id, false)}
                   >
                     Desactivar
                   </button>
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-
-        {mensaje && (
-          <p style={{ color: "#0d6efd", fontWeight: "bold" }}>{mensaje}</p>
+          </div>
         )}
+
+        {mensaje && <p style={styles.msg}>{mensaje}</p>}
       </div>
     </div>
   );
 }
+
+// ------------------------
+// ESTILOS
+// ------------------------
+const styles = {
+  page: {
+    background: "#f4f6f9",
+    minHeight: "100vh",
+    padding: "20px",
+    display: "flex",
+    justifyContent: "center",
+  },
+
+  container: {
+    width: "100%",
+    maxWidth: "900px",
+  },
+
+  title: {
+    marginBottom: "20px",
+  },
+
+  search: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    marginBottom: "15px",
+  },
+
+  input: {
+    flex: 1,
+    minWidth: "200px",
+    padding: "12px",
+    borderRadius: "8px",
+    border: "1px solid #ddd",
+  },
+
+  button: {
+    padding: "12px 16px",
+    background: "#0d6efd",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+  },
+
+  secondaryButton: {
+    padding: "12px 16px",
+    background: "#6c757d",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+  },
+
+  filters: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "15px",
+    flexWrap: "wrap",
+  },
+
+  filter: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    border: "1px solid #ddd",
+    background: "white",
+    cursor: "pointer",
+  },
+
+  filterActive: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    background: "#0d6efd",
+    color: "white",
+    border: "1px solid #0d6efd",
+  },
+
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "15px",
+  },
+
+  card: {
+    background: "white",
+    padding: "15px",
+    borderRadius: "12px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+  },
+
+  email: {
+    fontWeight: "bold",
+    wordBreak: "break-word",
+  },
+
+  row: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "10px",
+    flexWrap: "wrap",
+  },
+
+  btnGreen: {
+    background: "#28a745",
+    color: "white",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "8px",
+  },
+
+  btnRed: {
+    background: "#dc3545",
+    color: "white",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: "8px",
+  },
+
+  active: {
+    color: "green",
+    fontWeight: "bold",
+  },
+
+  inactive: {
+    color: "red",
+    fontWeight: "bold",
+  },
+
+  msg: {
+    marginTop: "15px",
+    color: "#0d6efd",
+    fontWeight: "bold",
+  },
+};
 
 export default AdminPage;
