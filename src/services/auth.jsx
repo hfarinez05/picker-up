@@ -7,35 +7,32 @@ import {
 import { doc, setDoc } from "firebase/firestore";
 
 export async function registrar(email, password) {
-  //console.log("👉 INICIANDO REGISTRO con:", email);
-
   try {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
       password,
     );
-    //console.log("✔ AUTH OK:", userCredential);
 
     const uid = userCredential.user.uid;
     const data = {
       email: email.toLowerCase().trim(),
       activo: false,
+      admin: false,
     };
 
     await setDoc(doc(db, "usuarios", uid), data);
-    console.log("✔ FIRESTORE OK: Documento creado en 'usuarios' con ID:", uid);
+    //console.log("✔ FIRESTORE OK: Documento creado en 'usuarios' con ID:", uid);
 
-    return userCredential;
+    return userCredential; // 👈 solo retorna si todo salió bien
   } catch (error) {
     if (error.code === "auth/email-already-in-use") {
-      //console.error("❌ ERROR: El correo ya está registrado");
-      alert("Este correo ya está registrado. Usa otro o inicia sesión.");
+      throw new Error(
+        "Este correo ya está registrado. Usa otro o inicia sesión.",
+      );
     } else {
-      //console.error("❌ ERROR EN REGISTRO:", error);
-      alert(error.message);
+      throw error; // 👈 lanza el error para que RegisterForm lo capture
     }
-    throw error;
   }
 }
 

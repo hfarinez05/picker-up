@@ -29,7 +29,7 @@ function App() {
         setUser(null);
         setActivo(null);
       }
-      setLoading(false); // Ya tenemos el estado de autenticación, podemos mostrar la app
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -44,8 +44,31 @@ function App() {
 
   if (user && activo === false) {
     return (
-      <div style={{ background: "red", color: "white" }}>
-        🚫 Cuenta bloqueada
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          background: "#f8d7da",
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            padding: "30px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+            textAlign: "center",
+            maxWidth: "400px",
+          }}
+        >
+          <h2 style={{ color: "#dc3545" }}>🚫 Cuenta bloqueada</h2>
+          <p style={{ margin: "15px 0", color: "#333" }}>
+            Tu cuenta está desactivada. Contacta al administrador para
+            habilitarla.
+          </p>
+        </div>
       </div>
     );
   }
@@ -53,10 +76,8 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Ruta de login */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/register" element={<RegisterForm />} />
-        {/* Ruta de pedidos (solo si está logueado y activo) */}
         <Route
           path="/pedidos"
           element={
@@ -67,11 +88,7 @@ function App() {
             )
           }
         />
-
-        {/* Ruta admin */}
         <Route path="/admin" element={<AdminPage />} />
-
-        {/* Ruta raíz */}
         <Route
           path="/"
           element={
