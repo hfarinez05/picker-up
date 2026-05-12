@@ -1,0 +1,35 @@
+/* Contenedor general */
+.page {
+  background: #f4f6f9;
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Grid responsivo */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 15px;
+}
+
+/* Ajustes en móviles */
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .row {
+    flex-direction: column;
+  }
+
+  .row button {
+    width: 100%;
+    margin-bottom: 6px;
+  }
+}

@@ -8,6 +8,7 @@ import {
   doc,
   updateDoc,
 } from "firebase/firestore";
+import "../styles/AdminPage.css";
 
 function AdminPage() {
   const [usuarios, setUsuarios] = useState([]);
