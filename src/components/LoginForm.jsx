@@ -6,28 +6,47 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
+    if (loading) return;
+
+    setLoading(true);
+    setError(null);
+
     try {
-      const user = await login(email, password);
-      navigate("/pedidos"); // redirige inmediatamente al listado de pedidos
+      await login(email, password);
+
+      // limpiar error si todo sale bien
+      setError(null);
+
+      // redirección
+      navigate("/pedidos");
     } catch (err) {
       console.error("❌ Error en login:", err.code, err.message);
 
+      const code = err.code;
+
       if (
-        err.code === "auth/user-not-found" ||
-        err.code === "auth/invalid-credential"
+        code === "auth/user-not-found" ||
+        code === "auth/invalid-credential" ||
+        code === "auth/invalid-login-credentials"
       ) {
         alert("Este correo no está registrado. Debe registrarse primero.");
         navigate("/register");
-      } else if (err.code === "auth/wrong-password") {
+      } else if (code === "auth/wrong-password") {
         setError("Contraseña incorrecta. Intente nuevamente.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Demasiados intentos. Intenta más tarde.");
       } else {
-        setError(err.message);
+        setError("Error al iniciar sesión. Intenta nuevamente.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,8 +73,8 @@ function LoginForm() {
         }}
       >
         <h2 style={{ marginBottom: "20px", color: "#0d6efd" }}>🔑 Login</h2>
+
         <input
-          id="email"
           type="email"
           placeholder="Correo"
           value={email}
@@ -69,8 +88,8 @@ function LoginForm() {
             border: "1px solid #ccc",
           }}
         />
+
         <input
-          id="password"
           type="password"
           placeholder="Contraseña"
           value={password}
@@ -84,12 +103,14 @@ function LoginForm() {
             border: "1px solid #ccc",
           }}
         />
+
         <button
           type="submit"
+          disabled={loading}
           style={{
             width: "100%",
             padding: "10px",
-            background: "#0d6efd",
+            background: loading ? "#6c757d" : "#0d6efd",
             color: "white",
             border: "none",
             borderRadius: "6px",
@@ -97,7 +118,7 @@ function LoginForm() {
             fontWeight: "bold",
           }}
         >
-          Iniciar sesión
+          {loading ? "Ingresando..." : "Iniciar sesión"}
         </button>
 
         {error && (

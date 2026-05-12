@@ -8,6 +8,7 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+
 import LoginForm from "./components/LoginForm";
 import PedidosList from "./components/PedidosList";
 import AdminPage from "./pages/AdminPage";
@@ -20,17 +21,31 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (usuario) => {
-      if (usuario) {
-        setUser(usuario);
-        const ref = doc(db, "usuarios", usuario.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) setActivo(snap.data().activo);
-      } else {
+      try {
+        if (usuario) {
+          setUser(usuario);
+
+          const ref = doc(db, "usuarios", usuario.uid);
+          const snap = await getDoc(ref);
+
+          if (snap.exists()) {
+            setActivo(snap.data().activo);
+          } else {
+            setActivo(false);
+          }
+        } else {
+          setUser(null);
+          setActivo(null);
+        }
+      } catch (error) {
+        console.error("Error obteniendo usuario:", error);
         setUser(null);
-        setActivo(null);
+        setActivo(false);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -42,6 +57,7 @@ function App() {
     );
   }
 
+  // 🚫 Usuario bloqueado
   if (user && activo === false) {
     return (
       <div
@@ -65,8 +81,7 @@ function App() {
         >
           <h2 style={{ color: "#dc3545" }}>🚫 Cuenta bloqueada</h2>
           <p style={{ margin: "15px 0", color: "#333" }}>
-            Tu cuenta está desactivada. Contacta al administrador para
-            habilitarla.
+            Tu cuenta está desactivada. Contacta al administrador.
           </p>
         </div>
       </div>
@@ -76,8 +91,19 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginForm />} />
-        <Route path="/register" element={<RegisterForm />} />
+        {/* Login */}
+        <Route
+          path="/login"
+          element={!user ? <LoginForm /> : <Navigate to="/pedidos" />}
+        />
+
+        {/* Register */}
+        <Route
+          path="/register"
+          element={!user ? <RegisterForm /> : <Navigate to="/pedidos" />}
+        />
+
+        {/* Pedidos (PROTEGIDO) */}
         <Route
           path="/pedidos"
           element={
@@ -88,12 +114,17 @@ function App() {
             )
           }
         />
-        <Route path="/admin" element={<AdminPage />} />
+
+        {/* Admin (PROTEGIDO BÁSICO) */}
+        <Route
+          path="/admin"
+          element={user && activo ? <AdminPage /> : <Navigate to="/login" />}
+        />
+
+        {/* Home */}
         <Route
           path="/"
-          element={
-            !user ? <Navigate to="/login" /> : <p>Bienvenido {user.email}</p>
-          }
+          element={<Navigate to={user ? "/pedidos" : "/login"} />}
         />
       </Routes>
     </Router>

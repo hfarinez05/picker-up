@@ -6,21 +6,47 @@ function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    if (loading) return;
+
+    setLoading(true);
+    setError(null);
+
     try {
       await registrar(email, password);
+
       alert(
         "Usuario registrado con éxito. Debe ser habilitado por el administrador.",
       );
+
       navigate("/login");
     } catch (err) {
-      alert(err.message);
-      if (err.message.includes("registrado")) {
+      console.error("❌ Error en registro:", err.code, err.message);
+
+      const code = err.code;
+
+      if (code === "auth/email-already-in-use") {
+        setError("Este correo ya está registrado.");
+      } else if (code === "auth/invalid-email") {
+        setError("Correo inválido.");
+      } else if (code === "auth/weak-password") {
+        setError("La contraseña debe tener al menos 6 caracteres.");
+      } else {
+        setError("Error al registrar usuario. Intenta nuevamente.");
+      }
+
+      // si quieres mantener tu lógica de redirección:
+      if (err.message?.includes("registrado")) {
         navigate("/login");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,8 +73,8 @@ function RegisterForm() {
         }}
       >
         <h2 style={{ marginBottom: "20px", color: "#0d6efd" }}>📝 Registro</h2>
+
         <input
-          id="email"
           type="email"
           placeholder="Correo"
           value={email}
@@ -62,8 +88,8 @@ function RegisterForm() {
             border: "1px solid #ccc",
           }}
         />
+
         <input
-          id="password"
           type="password"
           placeholder="Contraseña"
           value={password}
@@ -77,12 +103,14 @@ function RegisterForm() {
             border: "1px solid #ccc",
           }}
         />
+
         <button
           type="submit"
+          disabled={loading}
           style={{
             width: "100%",
             padding: "10px",
-            background: "#0d6efd",
+            background: loading ? "#6c757d" : "#0d6efd",
             color: "white",
             border: "none",
             borderRadius: "6px",
@@ -90,7 +118,7 @@ function RegisterForm() {
             fontWeight: "bold",
           }}
         >
-          Registrar
+          {loading ? "Registrando..." : "Registrar"}
         </button>
 
         {error && (
