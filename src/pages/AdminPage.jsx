@@ -9,8 +9,6 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-import "../styles/adminPage.css";
-
 function AdminPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [correoBusqueda, setCorreoBusqueda] = useState("");
