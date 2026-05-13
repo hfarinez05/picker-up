@@ -26,6 +26,14 @@ function PedidosList({ user }) {
   const [fecha, setFecha] = useState("");
   const [skus, setSkus] = useState("");
 
+  function formatearFecha(fecha) {
+    const d = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
+    const dia = String(d.getDate()).padStart(2, "0");
+    const mes = String(d.getMonth() + 1).padStart(2, "0");
+    const anio = d.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  }
+
   // 🔹 Funciones matemáticas
   function obtenerPiqueoUnitario(skus) {
     if (skus >= 1 && skus <= 10) return 120;
@@ -184,9 +192,7 @@ function PedidosList({ user }) {
 
   // 🔹 Agrupar pedidos por día
   const pedidosAgrupados = pedidos.reduce((acc, p) => {
-    const fechaStr = new Date(
-      p.fecha.seconds ? p.fecha.seconds * 1000 : p.fecha,
-    ).toLocaleDateString();
+    const fechaStr = formatearFecha(p.fecha);
     if (!acc[fechaStr]) acc[fechaStr] = [];
     acc[fechaStr].push(p);
     return acc;
@@ -272,11 +278,7 @@ function PedidosList({ user }) {
               <tbody>
                 {pedidosAgrupados[dia].map((p) => (
                   <tr key={p.id}>
-                    <td>
-                      {new Date(
-                        p.fecha.seconds ? p.fecha.seconds * 1000 : p.fecha,
-                      ).toLocaleDateString()}
-                    </td>
+                    <td>{formatearFecha(p.fecha)}</td>
                     <td>{p.skus}</td>
                     <td>
                       {p.piqueoUnitario} x {p.skus} = {p.piqueoTotal}
