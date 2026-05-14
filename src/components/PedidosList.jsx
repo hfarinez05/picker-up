@@ -106,7 +106,7 @@ function PedidosList({ user }) {
   async function cargarPedidosIniciales() {
     setLoading(true);
     const pedidosRef = collection(db, "usuarios", user.uid, "pedidos");
-    const q = query(pedidosRef, orderBy("fecha", "desc"), limit(20));
+    const q = query(pedidosRef, orderBy("fecha", "desc"), limit(50));
     const snap = await getDocs(q);
 
     const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -124,7 +124,7 @@ function PedidosList({ user }) {
       pedidosRef,
       orderBy("fecha", "desc"),
       startAfter(ultimoDoc),
-      limit(20),
+      limit(50),
     );
     const snap = await getDocs(q);
 
@@ -199,9 +199,11 @@ function PedidosList({ user }) {
   }, {});
 
   // 🔹 Totales mensuales
-  const totalMes = pedidos.reduce((sum, p) => sum + p.total, 0);
+  const totalMes = pedidos.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
   const descuentosMes = pedidos.reduce(
-    (sum, p) => sum + (p.afp + p.fonasa + p.afc),
+    (sum, p) =>
+      sum +
+      ((Number(p.afp) || 0) + (Number(p.fonasa) || 0) + (Number(p.afc) || 0)),
     0,
   );
   const netoMes = totalMes - descuentosMes;
@@ -239,11 +241,15 @@ function PedidosList({ user }) {
       {/* Tabla agrupada por día */}
       {Object.keys(pedidosAgrupados).map((dia) => {
         const totalDia = pedidosAgrupados[dia].reduce(
-          (sum, p) => sum + p.total,
+          (sum, p) => sum + (Number(p.total) || 0),
           0,
         );
         const descuentosDia = pedidosAgrupados[dia].reduce(
-          (sum, p) => sum + (p.afp + p.fonasa + p.afc),
+          (sum, p) =>
+            sum +
+            ((Number(p.afp) || 0) +
+              (Number(p.fonasa) || 0) +
+              (Number(p.afc) || 0)),
           0,
         );
         const netoDia = totalDia - descuentosDia;
@@ -305,13 +311,17 @@ function PedidosList({ user }) {
                 ))}
               </tbody>
             </table>
-            <p>
-              <strong>Subtotal del día:</strong> ${totalDia.toFixed(2)}
-            </p>
-            <p>
-              <strong>Total menos descuentos (18.5%):</strong> $
-              {netoDia.toFixed(2)}
-            </p>
+            <div className="resumen-dia">
+              <div className="columna izquierda">
+                Subtotal: ${Number(totalDia || 0).toFixed(2)}
+              </div>
+              <div className="columna centro">
+                Descuento (18.5%): ${Number(totalDia * 0.185).toFixed(2)}
+              </div>
+              <div className="columna derecha">
+                Total: ${Number(totalDia - totalDia * 0.185).toFixed(2)}
+              </div>
+            </div>
           </div>
         );
       })}
@@ -319,20 +329,34 @@ function PedidosList({ user }) {
       {/* Totales mensuales */}
       <div className="totales-mes">
         <h3>📅 Totales del mes</h3>
-        <p>
-          <strong>Total del mes:</strong> ${totalMes.toFixed(2)}
-        </p>
-        <p>
-          <strong>Total menos descuentos:</strong> ${netoMes.toFixed(2)}
-        </p>
-        <p>
+
+        <div className="resumen-mes">
+          <div className="columna izquierda">
+            Total bruto:
+            <div>${Number(totalMes || 0).toFixed(2)}</div>
+          </div>
+
+          <div className="columna centro">
+            Descuentos:
+            <div>${Number(totalMes - netoMes || 0).toFixed(2)}</div>
+          </div>
+
+          <div className="columna derecha">
+            Total neto:
+            <div>${Number(netoMes || 0).toFixed(2)}</div>
+          </div>
+        </div>
+
+        <p style={{ textAlign: "center", marginTop: "10px" }}>
           <strong>Pedidos del mes:</strong> {pedidosMes}
         </p>
       </div>
 
       {loading && <p>⏳ Cargando...</p>}
-      <button onClick={cargarMasPedidos}>Cargar más</button>
-      <button onClick={handleLogout} style={{ marginTop: "20px" }}>
+      <button onClick={cargarMasPedidos} className="btn-primary">
+        Cargar más
+      </button>
+      <button onClick={handleLogout} className="btn-danger">
         Cerrar sesión
       </button>
     </div>

@@ -1,0 +1,16 @@
+.link-text {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: #0066cc;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 14px;
+  display: block;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.link-text:hover {
+  color: #004080;
+}

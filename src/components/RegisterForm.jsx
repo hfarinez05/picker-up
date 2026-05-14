@@ -120,7 +120,20 @@ function RegisterForm() {
         >
           {loading ? "Registrando..." : "Registrar"}
         </button>
-
+        <button
+          type="button"
+          onClick={() => navigate("/login")}
+          style={{
+            marginTop: "10px",
+            background: "transparent",
+            border: "none",
+            color: "#0066cc",
+            cursor: "pointer",
+            textDecoration: "underline",
+          }}
+        >
+          ¿Ya tienes cuenta? Inicia sesión
+        </button>
         {error && (
           <p style={{ color: "red", marginTop: "15px", fontSize: "14px" }}>
             {error}

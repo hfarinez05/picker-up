@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../services/auth";
 
+import "../styles/loginForm.css";
+
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,9 +25,6 @@ function LoginForm() {
 
       // limpiar error si todo sale bien
       setError(null);
-
-      // redirección
-      navigate("/pedidos");
     } catch (err) {
       console.error("❌ Error en login:", err.code, err.message);
 
@@ -105,6 +104,7 @@ function LoginForm() {
         />
 
         <button
+          className="btn-primary"
           type="submit"
           disabled={loading}
           style={{
@@ -119,6 +119,13 @@ function LoginForm() {
           }}
         >
           {loading ? "Ingresando..." : "Iniciar sesión"}
+        </button>
+        <button
+          type="button"
+          className="link-text"
+          onClick={() => navigate("/register")}
+        >
+          ¿No tienes cuenta? Regístrate
         </button>
 
         {error && (

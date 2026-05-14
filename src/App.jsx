@@ -124,7 +124,7 @@ function App() {
         {/* Home */}
         <Route
           path="/"
-          element={<Navigate to={user ? "/pedidos" : "/login"} />}
+          element={<Navigate to={user ? "/pedidos" : "/register"} />}
         />
       </Routes>
     </Router>
