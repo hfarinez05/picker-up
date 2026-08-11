@@ -78,6 +78,19 @@ function AdminPage() {
   };
 
   // ------------------------
+  // MARCAR PAGO (solo identifica quién depositó, no toca "activo")
+  // ------------------------
+  const marcarPago = async (uid, pago) => {
+    await updateDoc(doc(db, "usuarios", uid), { pago });
+
+    setUsuarios((prev) => prev.map((u) => (u.id === uid ? { ...u, pago } : u)));
+
+    if (usuarioEncontrado?.id === uid) {
+      setUsuarioEncontrado({ ...usuarioEncontrado, pago });
+    }
+  };
+
+  // ------------------------
   // FILTRO
   // ------------------------
   const usuariosFiltrados = usuarios.filter((u) => {
@@ -142,6 +155,18 @@ function AdminPage() {
         {/* USUARIO ENCONTRADO (SOLO UNO) */}
         {usuarioEncontrado && (
           <div style={styles.card}>
+            <label style={styles.checkRow}>
+              <input
+                type="checkbox"
+                checked={!!usuarioEncontrado.pago}
+                onChange={(e) =>
+                  marcarPago(usuarioEncontrado.id, e.target.checked)
+                }
+                style={styles.checkbox}
+              />
+              <span style={styles.checkLabel}>Pagó</span>
+            </label>
+
             <p style={styles.email}>{usuarioEncontrado.email}</p>
 
             <p
@@ -173,6 +198,16 @@ function AdminPage() {
           <div style={styles.grid}>
             {usuariosFiltrados.map((u) => (
               <div key={u.id} style={styles.card}>
+                <label style={styles.checkRow}>
+                  <input
+                    type="checkbox"
+                    checked={!!u.pago}
+                    onChange={(e) => marcarPago(u.id, e.target.checked)}
+                    style={styles.checkbox}
+                  />
+                  <span style={styles.checkLabel}>Pagó</span>
+                </label>
+
                 <p style={styles.email}>{u.email}</p>
 
                 <p style={u.activo ? styles.active : styles.inactive}>
@@ -291,6 +326,27 @@ const styles = {
     padding: "15px",
     borderRadius: "12px",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+  },
+
+  checkRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "8px",
+    cursor: "pointer",
+    userSelect: "none",
+  },
+
+  checkbox: {
+    width: "18px",
+    height: "18px",
+    cursor: "pointer",
+  },
+
+  checkLabel: {
+    fontSize: "13px",
+    color: "#555",
+    fontWeight: "bold",
   },
 
   email: {
