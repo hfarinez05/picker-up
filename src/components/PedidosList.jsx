@@ -3,377 +3,400 @@ import { db } from "../services/firebase";
 import {
   collection,
   query,
+  where,
   orderBy,
-  limit,
-  startAfter,
   getDocs,
   addDoc,
   deleteDoc,
   doc,
+  writeBatch,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../services/auth";
 import "../styles/pedidosList.css";
 
+const pad = (n) => String(n).padStart(2, "0");
+const clp = (n) => "$" + Math.round(n).toLocaleString("es-CL");
+
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function aFecha(f) {
+  return f?.toDate ? f.toDate() : new Date(f);
+}
+
+function claveDia(f) {
+  const d = aFecha(f);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatearDia(clave) {
+  const [a, m, d] = clave.split("-");
+  return `${d}/${m}/${a}`;
+}
+
+function obtenerPiqueoUnitario(skus) {
+  if (skus <= 10) return 120;
+  if (skus <= 20) return 70;
+  if (skus <= 30) return 60;
+  if (skus <= 40) return 55;
+  if (skus <= 50) return 50;
+  return 40;
+}
+
+function calcularBase(skus) {
+  return skus <= 50 ? 1000 : 1200;
+}
+
+// Pedidos de un mes (formato "YYYY-MM")
+function consultaMes(uid, mes) {
+  const [a, m] = mes.split("-").map(Number);
+  return query(
+    collection(db, "usuarios", uid, "pedidos"),
+    where("fecha", ">=", new Date(a, m - 1, 1)),
+    where("fecha", "<", new Date(a, m, 1)),
+    orderBy("fecha", "desc"),
+  );
+}
+
 function PedidosList({ user }) {
   const navigate = useNavigate();
 
   const [pedidos, setPedidos] = useState([]);
-  const [ultimoDoc, setUltimoDoc] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  // Inputs controlados
-  const [fecha, setFecha] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [fecha, setFecha] = useState(hoyISO());
   const [skus, setSkus] = useState("");
-  const [porcentaje, setPorcentaje] = useState(
-    () => localStorage.getItem(`porcentaje_${user?.uid}`) ?? "",
-  );
-
-  function formatearFecha(fecha) {
-    const d = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
-    const dia = String(d.getDate()).padStart(2, "0");
-    const mes = String(d.getMonth() + 1).padStart(2, "0");
-    const anio = d.getFullYear();
-    return `${dia}/${mes}/${anio}`;
-  }
-
-  // 🔹 Funciones matemáticas
-  function obtenerPiqueoUnitario(skus) {
-    if (skus >= 1 && skus <= 10) return 120;
-    else if (skus >= 11 && skus <= 20) return 70;
-    else if (skus >= 21 && skus <= 30) return 60;
-    else if (skus >= 31 && skus <= 40) return 55;
-    else if (skus >= 41 && skus <= 50) return 50;
-    else return 40;
-  }
-
-  function calcularBase(skus) {
-    return skus <= 50 ? 1000 : 1200;
-  }
-
-  function aplicarDescuentos(total) {
-    const afp = total * 0.1058;
-    const fonasa = total * 0.05;
-    const afc = total * 0.0292;
-    const neto = total - (afp + fonasa + afc);
-    return { afp, fonasa, afc, neto };
-  }
-
-  // 🔹 Agregar pedido
-  async function agregarPedido() {
-    if (!user) {
-      alert("Debes iniciar sesión");
-      return;
+  const [mes, setMes] = useState(hoyISO().slice(0, 7));
+  const [aviso, setAviso] = useState("");
+  const [confirmando, setConfirmando] = useState(null);
+  const [porcentaje, setPorcentaje] = useState(() => {
+    try {
+      return localStorage.getItem(`porcentaje_${user?.uid}`) ?? "";
+    } catch {
+      return "";
     }
-    if (!fecha || !skus) {
-      alert("Datos inválidos");
-      return;
-    }
+  });
 
-    const [anio, mes, dia] = fecha.split("-");
-    const fechaObj = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia));
-    if (isNaN(fechaObj.getTime())) {
-      alert("La fecha ingresada no es válida");
-      return;
-    }
-
-    const ahora = new Date();
-    fechaObj.setHours(ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
-
-    const skusNum = parseInt(skus);
-    const piqueoUnitario = obtenerPiqueoUnitario(skusNum);
-    const piqueoTotal = piqueoUnitario * skusNum;
-    const base = calcularBase(skusNum);
-    const total = piqueoTotal + base;
-    const { afp, fonasa, afc, neto } = aplicarDescuentos(total);
-
-    await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
-      fecha: fechaObj,
-      skus: skusNum,
-      piqueoUnitario,
-      piqueoTotal,
-      base,
-      total,
-      afp,
-      fonasa,
-      afc,
-      neto,
-    });
-
-    //setFecha("");
-    setSkus("");
-    cargarPedidosIniciales();
+  function mostrarAviso(texto) {
+    setAviso(texto);
+    setTimeout(() => setAviso(""), 3500);
   }
 
-  // 🔹 Cargar pedidos iniciales
-  async function cargarPedidosIniciales() {
-    setLoading(true);
-    const pedidosRef = collection(db, "usuarios", user.uid, "pedidos");
-    const q = query(pedidosRef, orderBy("fecha", "desc"), limit(50));
-    const snap = await getDocs(q);
-
-    const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    setPedidos(docs);
-    setUltimoDoc(snap.docs[snap.docs.length - 1]);
-    setLoading(false);
+  function pedirConfirmacion(clave) {
+    setConfirmando(clave);
+    setTimeout(() => setConfirmando((c) => (c === clave ? null : c)), 3000);
   }
 
-  // 🔹 Cargar más pedidos
-  async function cargarMasPedidos() {
-    if (!ultimoDoc) return;
-    setLoading(true);
-    const pedidosRef = collection(db, "usuarios", user.uid, "pedidos");
-    const q = query(
-      pedidosRef,
-      orderBy("fecha", "desc"),
-      startAfter(ultimoDoc),
-      limit(50),
-    );
-    const snap = await getDocs(q);
-
-    const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    setPedidos((prev) => [...prev, ...docs]);
-    setUltimoDoc(snap.docs[snap.docs.length - 1]);
-    setLoading(false);
+  async function cargar() {
+    setCargando(true);
+    try {
+      const snap = await getDocs(consultaMes(user.uid, mes));
+      setPedidos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (error) {
+      console.error("Error cargando pedidos:", error);
+      mostrarAviso("No se pudieron cargar los pedidos.");
+    } finally {
+      setCargando(false);
+    }
   }
 
   useEffect(() => {
-    if (user) cargarPedidosIniciales();
-  }, [user]);
+    if (user && mes) cargar();
+  }, [user, mes]);
 
-  // 🔹 Guardar porcentaje en localStorage (por usuario)
   useEffect(() => {
-    if (user) localStorage.setItem(`porcentaje_${user.uid}`, porcentaje);
+    try {
+      if (user) localStorage.setItem(`porcentaje_${user.uid}`, porcentaje);
+    } catch {
+      /* sin almacenamiento disponible */
+    }
   }, [porcentaje, user]);
 
-  // 🔹 Logout
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate("/login");
-    } catch (error) {
-      alert("No se pudo cerrar sesión");
-    }
-  };
+  async function agregarPedido(e) {
+    e.preventDefault();
+    if (guardando) return;
 
-  // 🔹 Eliminar pedido individual
+    const n = parseInt(skus, 10);
+    if (!fecha || !(n >= 1)) {
+      mostrarAviso("Ingresa una fecha y una cantidad de SKUs de 1 o más.");
+      return;
+    }
+
+    const [a, m, d] = fecha.split("-").map(Number);
+    const ahora = new Date();
+    const fechaObj = new Date(
+      a,
+      m - 1,
+      d,
+      ahora.getHours(),
+      ahora.getMinutes(),
+      ahora.getSeconds(),
+    );
+
+    const piqueoUnitario = obtenerPiqueoUnitario(n);
+    const piqueoTotal = piqueoUnitario * n;
+    const base = calcularBase(n);
+
+    setGuardando(true);
+    try {
+      await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
+        fecha: fechaObj,
+        skus: n,
+        piqueoUnitario,
+        piqueoTotal,
+        base,
+        total: piqueoTotal + base,
+      });
+      setSkus("");
+      const mesNuevo = fecha.slice(0, 7);
+      if (mesNuevo !== mes) setMes(mesNuevo);
+      else await cargar();
+    } catch (error) {
+      console.error("Error guardando pedido:", error);
+      mostrarAviso("No se pudo guardar el pedido.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   async function eliminarPedido(id) {
-    if (!user) return;
+    if (confirmando !== id) {
+      pedirConfirmacion(id);
+      return;
+    }
+    setConfirmando(null);
     try {
       await deleteDoc(doc(db, "usuarios", user.uid, "pedidos", id));
       setPedidos((prev) => prev.filter((p) => p.id !== id));
     } catch (error) {
-      console.error("Error al eliminar pedido:", error);
-      alert("No se pudo eliminar el pedido");
+      console.error("Error eliminando pedido:", error);
+      mostrarAviso("No se pudo eliminar el pedido.");
     }
   }
 
-  // 🔹 Eliminar todos los pedidos del mes
-  async function eliminarTodosLosPedidos() {
-    if (!user) return;
-    const confirmacion = confirm(
-      "¿Seguro que quieres borrar TODOS los pedidos del mes?",
-    );
-    if (!confirmacion) return;
-
+  async function borrarMes() {
+    if (confirmando !== "mes") {
+      pedirConfirmacion("mes");
+      return;
+    }
+    setConfirmando(null);
     try {
-      const pedidosRef = collection(db, "usuarios", user.uid, "pedidos");
-      const snapshot = await getDocs(pedidosRef);
-
-      if (snapshot.empty) {
-        alert("No hay pedidos para eliminar");
+      const snap = await getDocs(consultaMes(user.uid, mes));
+      if (snap.empty) {
+        mostrarAviso("No hay pedidos en este mes.");
         return;
       }
-
-      const eliminaciones = snapshot.docs.map((docu) =>
-        deleteDoc(doc(db, "usuarios", user.uid, "pedidos", docu.id)),
-      );
-
-      await Promise.all(eliminaciones);
+      for (let i = 0; i < snap.docs.length; i += 400) {
+        const batch = writeBatch(db);
+        snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
       setPedidos([]);
-      alert("Todos los pedidos del mes fueron eliminados");
+      mostrarAviso("Pedidos del mes eliminados.");
     } catch (error) {
-      console.error("Error al eliminar todos los pedidos:", error);
-      alert("No se pudieron eliminar los pedidos");
+      console.error("Error borrando el mes:", error);
+      mostrarAviso("No se pudieron eliminar los pedidos.");
     }
   }
 
-  // 🔹 Porcentaje de descuento (vacío = 0%)
-  const factor = (Number(porcentaje) || 0) / 100;
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch {
+      mostrarAviso("No se pudo cerrar sesión.");
+    }
+  };
 
-  // 🔹 Agrupar pedidos por día
-  const pedidosAgrupados = pedidos.reduce((acc, p) => {
-    const fechaStr = formatearFecha(p.fecha);
-    if (!acc[fechaStr]) acc[fechaStr] = [];
-    acc[fechaStr].push(p);
-    return acc;
-  }, {});
+  // Cálculos (porcentaje vacío = 0%)
+  const pct = Number(porcentaje) || 0;
+  const factor = pct / 100;
 
-  // 🔹 Totales mensuales
-  const totalMes = pedidos.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
-  const descuentosMes = totalMes * factor;
-  const netoMes = totalMes - descuentosMes;
-  const pedidosMes = pedidos.length;
+  const dias = [];
+  const porDia = {};
+  pedidos.forEach((p) => {
+    const k = claveDia(p.fecha);
+    if (!porDia[k]) {
+      porDia[k] = [];
+      dias.push(k);
+    }
+    porDia[k].push(p);
+  });
+
+  const totalMes = pedidos.reduce((s, p) => s + (Number(p.total) || 0), 0);
+  const descuentoMes = totalMes * factor;
+  const [anioMes, numMes] = mes.split("-");
 
   return (
-    <div className="tabla-pedidos-container">
-      <h2>📋 Registrar Pedidos del Día</h2>
-      <p>Bienvenido {user?.email}</p>
+    <div className="pl-page">
+      <main className="pl-main">
+        <h1 className="pl-title">Mis pedidos</h1>
+        <p className="pl-user">{user?.email}</p>
 
-      {/* Formulario controlado */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          agregarPedido();
-        }}
-      >
-        <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          required
-        />
-        <input
-          type="number"
-          min="1"
-          value={skus}
-          onChange={(e) => setSkus(e.target.value)}
-          placeholder="SKU's"
-          required
-        />
-        <button type="submit">Agregar Pedido</button>
-      </form>
+        {aviso && (
+          <p className="pl-aviso" role="status">
+            {aviso}
+          </p>
+        )}
 
-      {/* Porcentaje de descuento */}
-      <div style={{ margin: "15px 0" }}>
-        <label>
-          Descuento (%):{" "}
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
-            value={porcentaje}
-            onChange={(e) => setPorcentaje(e.target.value)}
-            placeholder="Ej: 18.5"
-          />
-        </label>
-      </div>
-
-      {/* Tabla agrupada por día */}
-      {Object.keys(pedidosAgrupados).map((dia) => {
-        const totalDia = pedidosAgrupados[dia].reduce(
-          (sum, p) => sum + (Number(p.total) || 0),
-          0,
-        );
-        const descuentoDia = totalDia * factor;
-
-        return (
-          <div key={dia} className="grupo-dia">
-            <table className="tabla-pedidos">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>SKU'S</th>
-                  <th>Piqueo</th>
-                  <th>Base</th>
-                  <th>Total</th>
-                  <th>
-                    <button
-                      onClick={eliminarTodosLosPedidos}
-                      style={{
-                        background: "#dc3545",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        marginTop: "10px",
-                      }}
-                    >
-                      X
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidosAgrupados[dia].map((p) => (
-                  <tr key={p.id}>
-                    <td>{formatearFecha(p.fecha)}</td>
-                    <td>{p.skus}</td>
-                    <td>
-                      {p.piqueoUnitario} x {p.skus} = {p.piqueoTotal}
-                    </td>
-                    <td>{p.base}</td>
-                    <td>{p.total}</td>
-                    <td>
-                      <button
-                        onClick={() => eliminarPedido(p.id)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "#dc3545",
-                          fontWeight: "bold",
-                          fontSize: "16px",
-                        }}
-                        title="Eliminar pedido"
-                      >
-                        X
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="resumen-dia">
-              <div className="columna izquierda">
-                Subtotal: ${totalDia.toFixed(2)}
+        <section className="pl-card">
+          <form onSubmit={agregarPedido}>
+            <div className="pl-row">
+              <div>
+                <label htmlFor="fecha">Fecha</label>
+                <input
+                  id="fecha"
+                  name="fecha"
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  required
+                />
               </div>
-              <div className="columna centro">
-                Descuento ({Number(porcentaje) || 0}%): $
-                {descuentoDia.toFixed(2)}
-              </div>
-              <div className="columna derecha">
-                Total: ${(totalDia - descuentoDia).toFixed(2)}
+              <div>
+                <label htmlFor="skus">SKUs</label>
+                <input
+                  id="skus"
+                  name="skus"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  placeholder="0"
+                  value={skus}
+                  onChange={(e) => setSkus(e.target.value)}
+                  required
+                />
               </div>
             </div>
-          </div>
-        );
-      })}
+            <button className="pl-primary" type="submit" disabled={guardando}>
+              {guardando ? "Guardando..." : "Agregar pedido"}
+            </button>
+          </form>
+        </section>
 
-      {/* Totales mensuales */}
-      <div className="totales-mes">
-        <h3>📅 Totales del mes</h3>
-
-        <div className="resumen-mes">
-          <div className="columna izquierda">
-            Total bruto:
-            <div>${totalMes.toFixed(2)}</div>
+        <section className="pl-card">
+          <div className="pl-row">
+            <div>
+              <label htmlFor="mes">Mes</label>
+              <input
+                id="mes"
+                name="mes"
+                type="month"
+                value={mes}
+                onChange={(e) => e.target.value && setMes(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="porcentaje">Descuento (%)</label>
+              <input
+                id="porcentaje"
+                name="porcentaje"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Ej: 18.5"
+                value={porcentaje}
+                onChange={(e) => setPorcentaje(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="columna centro">
-            Descuentos:
-            <div>${descuentosMes.toFixed(2)}</div>
+          <div className="pl-resumen">
+            <div>
+              <span>Total bruto</span>
+              <b>{clp(totalMes)}</b>
+            </div>
+            <div>
+              <span>Descuento</span>
+              <b className="pl-out">{clp(descuentoMes)}</b>
+            </div>
+            <div>
+              <span>Total neto</span>
+              <b className="pl-in">{clp(totalMes - descuentoMes)}</b>
+            </div>
           </div>
+          <p className="pl-cant">
+            Pedidos del mes: <strong>{pedidos.length}</strong>
+          </p>
+        </section>
 
-          <div className="columna derecha">
-            Total neto:
-            <div>${netoMes.toFixed(2)}</div>
-          </div>
+        {cargando && <p className="pl-vacio">Cargando...</p>}
+
+        {!cargando && dias.length === 0 && (
+          <section className="pl-card">
+            <p className="pl-vacio">
+              Aún no hay pedidos este mes. Agrega el primero arriba.
+            </p>
+          </section>
+        )}
+
+        {!cargando &&
+          dias.map((k) => {
+            const grupo = porDia[k];
+            const sub = grupo.reduce((s, p) => s + (Number(p.total) || 0), 0);
+            return (
+              <section className="pl-card" key={k}>
+                <h2 className="pl-dia-titulo">{formatearDia(k)}</h2>
+
+                {grupo.map((p) => (
+                  <div className="pl-item" key={p.id}>
+                    <div>
+                      <strong>{p.skus} SKUs</strong>
+                      <small>
+                        {p.piqueoUnitario} × {p.skus} = {clp(p.piqueoTotal)} ·
+                        base {clp(p.base)}
+                      </small>
+                    </div>
+                    <div className="pl-monto">{clp(p.total)}</div>
+                    <button
+                      type="button"
+                      className={`pl-del ${confirmando === p.id ? "pl-sure" : ""}`}
+                      onClick={() => eliminarPedido(p.id)}
+                      aria-label="Eliminar pedido"
+                    >
+                      {confirmando === p.id ? "¿Eliminar?" : "✕"}
+                    </button>
+                  </div>
+                ))}
+
+                <div className="pl-dia">
+                  <div>
+                    <span>Subtotal</span>
+                    {clp(sub)}
+                  </div>
+                  <div>
+                    <span>Descuento ({pct}%)</span>
+                    {clp(sub * factor)}
+                  </div>
+                  <div>
+                    <span>Total</span>
+                    <strong>{clp(sub - sub * factor)}</strong>
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+
+        <div className="pl-pie">
+          <button
+            type="button"
+            className={`pl-sec ${confirmando === "mes" ? "pl-sure" : ""}`}
+            onClick={borrarMes}
+          >
+            {confirmando === "mes"
+              ? `¿Borrar todo ${numMes}/${anioMes}?`
+              : "Borrar mes"}
+          </button>
+          <button type="button" className="pl-sec" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
         </div>
-
-        <p style={{ textAlign: "center", marginTop: "10px" }}>
-          <strong>Pedidos del mes:</strong> {pedidosMes}
-        </p>
-      </div>
-
-      {loading && <p>⏳ Cargando...</p>}
-      <button onClick={cargarMasPedidos} className="btn-primary">
-        Cargar más
-      </button>
-      <button onClick={handleLogout} className="btn-danger">
-        Cerrar sesión
-      </button>
+      </main>
     </div>
   );
 }
