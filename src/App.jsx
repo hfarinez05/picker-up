@@ -17,30 +17,31 @@ import RegisterForm from "./components/RegisterForm";
 function App() {
   const [user, setUser] = useState(null);
   const [activo, setActivo] = useState(null);
+  const [esAdmin, setEsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (usuario) => {
       try {
         if (usuario) {
-          setUser(usuario);
+          setLoading(true);
 
-          const ref = doc(db, "usuarios", usuario.uid);
-          const snap = await getDoc(ref);
+          const snap = await getDoc(doc(db, "usuarios", usuario.uid));
+          const datos = snap.exists() ? snap.data() : null;
 
-          if (snap.exists()) {
-            setActivo(snap.data().activo);
-          } else {
-            setActivo(false);
-          }
+          setActivo(datos?.activo === true);
+          setEsAdmin(datos?.admin === true);
+          setUser(usuario); // se asigna DESPUÉS de saber si está activo
         } else {
           setUser(null);
           setActivo(null);
+          setEsAdmin(false);
         }
       } catch (error) {
         console.error("Error obteniendo usuario:", error);
         setUser(null);
         setActivo(false);
+        setEsAdmin(false);
       } finally {
         setLoading(false);
       }
@@ -115,10 +116,16 @@ function App() {
           }
         />
 
-        {/* Admin (PROTEGIDO BÁSICO) */}
+        {/* Admin (solo administradores) */}
         <Route
           path="/admin"
-          element={user && activo ? <AdminPage /> : <Navigate to="/login" />}
+          element={
+            user && activo && esAdmin ? (
+              <AdminPage />
+            ) : (
+              <Navigate to="/pedidos" />
+            )
+          }
         />
 
         {/* Home */}

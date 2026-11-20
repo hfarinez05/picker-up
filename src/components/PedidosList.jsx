@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { auth, db } from "../services/firebase";
+import { db } from "../services/firebase";
 import {
   collection,
   query,
@@ -25,6 +25,9 @@ function PedidosList({ user }) {
   // Inputs controlados
   const [fecha, setFecha] = useState("");
   const [skus, setSkus] = useState("");
+  const [porcentaje, setPorcentaje] = useState(
+    () => localStorage.getItem(`porcentaje_${user?.uid}`) ?? "",
+  );
 
   function formatearFecha(fecha) {
     const d = new Date(fecha.seconds ? fecha.seconds * 1000 : fecha);
@@ -138,6 +141,11 @@ function PedidosList({ user }) {
     if (user) cargarPedidosIniciales();
   }, [user]);
 
+  // 🔹 Guardar porcentaje en localStorage (por usuario)
+  useEffect(() => {
+    if (user) localStorage.setItem(`porcentaje_${user.uid}`, porcentaje);
+  }, [porcentaje, user]);
+
   // 🔹 Logout
   const handleLogout = async () => {
     try {
@@ -190,6 +198,9 @@ function PedidosList({ user }) {
     }
   }
 
+  // 🔹 Porcentaje de descuento (vacío = 0%)
+  const factor = (Number(porcentaje) || 0) / 100;
+
   // 🔹 Agrupar pedidos por día
   const pedidosAgrupados = pedidos.reduce((acc, p) => {
     const fechaStr = formatearFecha(p.fecha);
@@ -200,12 +211,7 @@ function PedidosList({ user }) {
 
   // 🔹 Totales mensuales
   const totalMes = pedidos.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
-  const descuentosMes = pedidos.reduce(
-    (sum, p) =>
-      sum +
-      ((Number(p.afp) || 0) + (Number(p.fonasa) || 0) + (Number(p.afc) || 0)),
-    0,
-  );
+  const descuentosMes = totalMes * factor;
   const netoMes = totalMes - descuentosMes;
   const pedidosMes = pedidos.length;
 
@@ -238,21 +244,29 @@ function PedidosList({ user }) {
         <button type="submit">Agregar Pedido</button>
       </form>
 
+      {/* Porcentaje de descuento */}
+      <div style={{ margin: "15px 0" }}>
+        <label>
+          Descuento (%):{" "}
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={porcentaje}
+            onChange={(e) => setPorcentaje(e.target.value)}
+            placeholder="Ej: 18.5"
+          />
+        </label>
+      </div>
+
       {/* Tabla agrupada por día */}
       {Object.keys(pedidosAgrupados).map((dia) => {
         const totalDia = pedidosAgrupados[dia].reduce(
           (sum, p) => sum + (Number(p.total) || 0),
           0,
         );
-        const descuentosDia = pedidosAgrupados[dia].reduce(
-          (sum, p) =>
-            sum +
-            ((Number(p.afp) || 0) +
-              (Number(p.fonasa) || 0) +
-              (Number(p.afc) || 0)),
-          0,
-        );
-        const netoDia = totalDia - descuentosDia;
+        const descuentoDia = totalDia * factor;
 
         return (
           <div key={dia} className="grupo-dia">
@@ -313,13 +327,14 @@ function PedidosList({ user }) {
             </table>
             <div className="resumen-dia">
               <div className="columna izquierda">
-                Subtotal: ${Number(totalDia || 0).toFixed(2)}
+                Subtotal: ${totalDia.toFixed(2)}
               </div>
               <div className="columna centro">
-                Descuento (18.5%): ${Number(totalDia * 0.185).toFixed(2)}
+                Descuento ({Number(porcentaje) || 0}%): $
+                {descuentoDia.toFixed(2)}
               </div>
               <div className="columna derecha">
-                Total: ${Number(totalDia - totalDia * 0.185).toFixed(2)}
+                Total: ${(totalDia - descuentoDia).toFixed(2)}
               </div>
             </div>
           </div>
@@ -333,17 +348,17 @@ function PedidosList({ user }) {
         <div className="resumen-mes">
           <div className="columna izquierda">
             Total bruto:
-            <div>${Number(totalMes || 0).toFixed(2)}</div>
+            <div>${totalMes.toFixed(2)}</div>
           </div>
 
           <div className="columna centro">
             Descuentos:
-            <div>${Number(totalMes - netoMes || 0).toFixed(2)}</div>
+            <div>${descuentosMes.toFixed(2)}</div>
           </div>
 
           <div className="columna derecha">
             Total neto:
-            <div>${Number(netoMes || 0).toFixed(2)}</div>
+            <div>${netoMes.toFixed(2)}</div>
           </div>
         </div>
 
